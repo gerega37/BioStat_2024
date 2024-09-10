@@ -55,6 +55,23 @@ data %>%
   select(where(function(x) sd(x, na.rm = TRUE) > 2 & mean(x, na.rm = TRUE) < 10))
 ```
 ```{r}
+data %>% 
+  select(`Эритроциты__Визит 1` = `Эритроциты_E1`, `Эритроциты__Визит 2` = `Эритроциты_E2`)
+```
+#dplyr::slice()
 
+```{r}
+data %>% 
+  slice(1:10)
+```
+```{r}
+data %>% 
+  slice_min(`Возраст`)
+```
+
+
+```{r}
+data %>% 
+  filter(`Пол` ==  "Женский")
 ```
 
