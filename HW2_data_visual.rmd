@@ -1,0 +1,354 @@
+---
+title: "HW_visualization"
+author: "Tsvetkova O."
+date: "2024-10-20"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE, error = FALSE, fig.width=16, fig.height=10)
+
+library(tidyverse)
+library(ggpubr)
+library(patchwork)
+```
+
+## Чтение файла
+
+```{r dataLoading}
+hogwarts <- read_csv("data/hogwarts_2024.csv")
+hogwarts |> head()
+```
+
+```{r}
+hogwarts |> glimpse()
+
+hogwarts <- hogwarts |> mutate(
+  across(c(house, course, sex, wandCore, bloodStatus), ~ as.factor(.x))
+)
+```
+
+## Диаграммы рассеяния (скаттерплоты)
+
+1. Постройте скаттерплот, визуализирующий связь между суммарным
+баллом студента за год и оценкой за экзамен по травологии. Добавьте на
+график линию тренда. Удалите доверительную область и сделайте линию
+прямой. Подумайте, как избежать того, чтобы записать одни и те же
+координаты x и y дважды. Проинтерпретируйте график. (1 б.)
+
+```{r}
+theme_custom <- theme(
+    axis.text = element_text(size = 20),
+    axis.title = element_text(size = 25),
+    legend.text = element_text(size = 20),
+    legend.title = element_text(size = 20),
+    plot.title = element_text(size = 25, hjust = 0.5),
+    strip.text = element_text(size = 25)
+)
+
+ggplot(hogwarts)+
+  geom_point(aes(x = result, y = `Herbology exam`), size = 3)+ 
+  geom_smooth(aes(x = result, y = `Herbology exam`), method = "lm", se = FALSE, color = "red")+
+  labs(
+    title = "Суммарный балл vs Оценка за экзамен по травологии",
+    x = "Суммарный балл за год",
+    y = "Оценка за экзамен по травологии"
+  )+
+  theme_bw()+ 
+  theme_custom 
+```
+График показывает положительную линейную зависимость между общим годовым баллом и оценкой за экзамен по травологии. Это подтверждается восходящим наклоном линии тренда. Распределение данных указывает на то, что высокие итоговые баллы чаще встречаются у успешных студентов, которые обычно получают хорошие оценки и по другим предметам. Однако заметны некоторые отклонения, особенно среди студентов с низкими баллами, что может свидетельствовать о разных уровнях успеваемости среди учащихся.
+
+
+2. Отобразите на одной иллюстрации скаттерплоты, аналогичные тому, что вы делали на первом задании, для экзаменов по травологии,
+магловедению, прорицаниям и зельеварению. На иллюстрации также должна присутствовать линия тренда с характеристиками, аналогичными
+тем, что были в пункте 1. Раскрасьте точки в разные цвета, в соответствии с факультетами. Используйте стандартные цвета факультетов (как в
+лекционных rmd). Проинтерпретируйте полученный результат. (1 б). Если вы создадите иллюстрацию из этого пункта, используя только пакеты
+семейства tidyverse, и не привлекая дополнительные средства, вы получите дополнительные 0.5 б.
+
+```{r}
+house_colors <- c("Gryffindor" = "#C50000",
+                  "Hufflepuff" = "#ECB939",
+                  "Ravenclaw" = "#41A6D9",
+                  "Slytherin" = "#1F5D25")
+
+hogwarts %>%
+  pivot_longer(cols = c(`Herbology exam`, `Muggle studies exam`, 
+                        `Divinations exam`, `Potions exam`),
+               names_to = "exam",
+               values_to = "score") %>%
+  mutate(exam = recode(exam,
+                       `Herbology exam` = "Экзамен по травологии",
+                       `Muggle studies exam` = "Экзамен по магловедению",
+                       `Divinations exam` = "Экзамен по прорицаниям",
+                       `Potions exam` = "Экзамен по зельеварению")) %>%
+  ggplot(aes(x = result, y = score, color = house)) +
+  geom_point(size = 3) + 
+  geom_smooth(method = "lm", se = FALSE) +
+  facet_wrap(~ exam, scales = "free_y") +  
+  scale_color_manual(values = house_colors) +  
+  labs(
+    title = "Скаттерплоты для различных экзаменов с линиями тренда",
+    x = "Суммарный балл за год",
+    y = "Оценка за экзамен"
+  ) +
+  theme_bw()+
+  theme_custom
+```
+
+На экзаменах по прорицаниям, травологии и магловедению наблюдается положительная корреляция между итоговым баллом студента и оценкой за экзамен. Однако на экзамене по зельеварению линейная зависимость отсутствует, и успешность может зависеть от других факторов.
+
+3. Видоизмените график, полученный на предыдущем шаге. Сгруппируйте и покрасьте линии тренда в соответствии с одной из категориальных
+переменных (с такой, которая подсвечивает одно из наблюдений на предыдущем этапе, относящееся ко всем 4-м экзаменам). Постарайтесь
+избежать коллизий в легенде, при этом сохранив и цветовую палитру для раскраски точек по факультетам. (1 б.)
+
+```{r}
+hogwarts %>%
+  pivot_longer(cols = c(`Herbology exam`, `Muggle studies exam`, 
+                        `Divinations exam`, `Potions exam`),
+               names_to = "exam",
+               values_to = "score") %>%
+  mutate(exam = recode(exam,
+                       `Herbology exam` = "Экзамен по травологии",
+                       `Muggle studies exam` = "Экзамен по магловедению",
+                       `Divinations exam` = "Экзамен по прорицаниям",
+                       `Potions exam` = "Экзамен по зельеварению")) %>%
+  ggplot(aes(x = result, y = score, color = house)) +
+  geom_point() +
+  geom_smooth(aes(group = sex, color = sex), method = "lm", se = FALSE, linetype = "solid") + 
+  facet_wrap(~ exam, scales = "free") +
+  labs(
+    title = "Скаттерплоты для различных экзаменов с линиями тренда по полу",
+    x = "Суммарный балл за год",
+    y = "Оценка за экзамен"
+  ) +
+  scale_fill_manual(values = c("Gryffindor" = "#C50000", 
+                             "Hufflepuff" = "#ECB939", 
+                             "Ravenclaw" = "#41A6D9", 
+                             "Slytherin" = "#1F5D25"))+
+  theme_bw() +
+  theme_custom
+```
+## geom_col и вещи вокруг него
+
+1. Постройте барплот (столбиковую диаграмму) распределения набранных баллов за первый семестр (с 1-й по 17-ю неделю включительно) у
+студентов разного происхождения. Если у вас возникают трудности, можете обратиться к шпаргалке по dplyr от posit. Выдвиньте гипотезу (или
+гипотезы), почему распределение получилось именно таким. (1 б.)
+
+```{r}
+hogwarts_semester1 <- hogwarts %>%
+  select(id, bloodStatus, starts_with("week_")) %>%
+  select(1:17) %>%
+  mutate(total_points_sem1 = rowSums(select(., starts_with("week_")))) %>%
+  group_by(bloodStatus) %>%
+  summarise(total_points_sem1 = sum(total_points_sem1))
+
+ggplot(hogwarts_semester1, aes(x = bloodStatus, y = total_points_sem1, fill = bloodStatus))+
+  geom_bar(stat = "identity")+
+  labs(title = "Распределение набранных баллов за 1-й семестр по происхождению студентов",
+       x = "Происхождение",
+       y = "Набранные баллы за 1-й семестр")+
+  theme_bw()+
+  theme_custom
+```
+Одной из ключевых причин такого распределения баллов может быть то, что полукровок значительно больше, чем чистокровных и магглорождённых студентов. Это объясняет, почему они получили больше итоговых баллов.
+
+Поскольку полукровок больше, общее количество баллов, заработанных ими за первый семестр, будет выше из-за большего числа участников в этой группе, даже если их средние баллы аналогичны другим группам.
+
+
+2. Модифицируйте предыдущий график – отсортируйте столбцы в порядке убывания суммы баллов. Добавьте на график текстовые метки,
+отражающие число студентов каждого происхождения. Попробуйте использовать для этой задачи не geom_text, а geom_label. Настройте
+внешний вид geom_label по своему усмотрению. Поправьте название оси.
+Проинтерпретируйте график. Соотносится ли интерпретация с вашей гипотезой из пункта 1? (1 б.)
+
+```{r}
+hogwarts_semester1 <- hogwarts %>%
+  select(id, bloodStatus, starts_with("week_")) %>%
+  select(1:17) %>%
+  mutate(total_points_sem1 = rowSums(select(., starts_with("week_")))) %>%
+  group_by(bloodStatus) %>%
+  summarise(total_points = sum(total_points_sem1), 
+            num_students = n()) %>%
+  arrange(desc(total_points))
+
+ggplot(hogwarts_semester1, aes(x = reorder(bloodStatus, -total_points), y = total_points, fill = bloodStatus))+
+  geom_bar(stat = "identity")+
+  geom_label(aes(label = paste0("Число студентов: ", num_students)), 
+             size = 5, fill = "white", color = "black", label.padding = unit(0.25, "lines"))+
+  labs(title = "Распределение набранных баллов за 1-й семестр по происхождению студентов",
+       x = "Происхождение студентов",
+       y = "Сумма набранных баллов за 1-й семестр")+
+  theme_bw()+
+  theme_custom
+```
+График подтверждает гипотезу о том, что основная причина такого высокого результата у студентов-полукровок — высокое количество студентов в этой группе. 
+
+
+3. И снова измените график – добавьте на него разбивку не только по происхождению, но и по полу. Раскрасьте столбцы по происхождению.
+Сделайте подписи к столбцам читаемыми. Дайте графику название, измените, если требуется, название осей. Сделайте шаг для оси, на
+которой отображены очки, через каждую тысячу баллов. Разместите текстовые метки по правому краю графика. Настройте график таким
+образом, чтобы метки были видны целиком и не обрезались. Сохраните график на устройство.(1.5 б.)
+
+```{r}
+hogwarts_semester1 <- hogwarts %>%
+  select(id, bloodStatus, sex, starts_with("week_")) %>%
+  select(1:17) %>%
+  mutate(total_points_sem1 = rowSums(select(., starts_with("week_")))) %>%
+  group_by(bloodStatus, sex) %>% 
+  summarise(total_points = sum(total_points_sem1),  
+            num_students = n(), .groups = 'drop') %>%
+  arrange(desc(total_points))
+
+ggplot(hogwarts_semester1, aes(x = reorder(bloodStatus, -total_points), y = total_points, fill = bloodStatus))+
+  geom_bar(stat = "identity", position = position_dodge())+
+  geom_label(aes(label = paste0("Кол-во: ", num_students)), 
+             size = 4, fill = "white", color = "black", 
+             label.padding = unit(0.25, "lines"), 
+             position = position_dodge(width = 0.9), hjust = -0.2)+
+  scale_y_continuous(breaks = seq(0, max(hogwarts_semester1$total_points), by = 1000))+
+  labs(title = "Распределение набранных баллов за 1-й семестр по происхождению и полу студентов",
+       x = "Происхождение студентов",
+       y = "Сумма набранных баллов за 1-й семестр")+
+  theme_bw()+
+  theme_custom+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))+
+  facet_grid(. ~ sex)
+
+ggsave("hogwarts_semester1_plot_facet.png", width = 10, height = 8)
+```
+
+
+
+4. Изучите функцию coord_flip() . Как вы думаете, когда она может быть
+полезна? Как вы думаете, в чем ее плюсы и минусы? (дополнительные 0.5
+б.)
+
+Функция coord_flip() в ggplot2 позволяет поменять оси местами, улучшая читаемость и облегчая сравнение значений. 
+Это полезно в разных ситуациях: для улучшения читаемости, сравнения категорий и изменения представления данных. 
+Плюсы: улучшение читаемости, наглядность сравнения.
+Минусы: потеря привычного восприятия и сложности с легендой.
+
+### Разное
+
+1. Сравните распределение баллов за экзамен по зельеварению и за экзамен по древним рунам. 
+Сделайте это тремя разными способами. Под разными способами понимаются идеологически разные геомы или способы группировки. 
+Не считаются разными способами изменения константных визуальных параметров (цвет заливки, размер фигур) на
+сходных в остальном графиках. Объедините графики, таким образом, чтобы результирующий график имел два столбца и 2 строки. Два графика
+должны находиться в верхней строке и занимать равную площадь. Третий график должен занимать нижнюю строку целиком. (2 б).
+
+
+```{r}
+exam_scores <- hogwarts %>%
+  select(`Potions exam`, `Study of ancient runes exam`) %>%
+  pivot_longer(cols = everything(), names_to = "exam", values_to = "score")
+
+hist_plot <- ggplot(exam_scores, aes(x = score, fill = exam))+
+  geom_histogram(position = "identity", alpha = 0.6, bins = 30)+
+  labs(title = "Гистограмма баллов за экзамены",
+       x = "Баллы",
+       y = "Число студентов")+
+  theme_minimal()
+
+box_plot <- ggplot(exam_scores, aes(x = exam, y = score, fill = exam))+
+  geom_boxplot()+
+  labs(title = "Ящик с усами: Баллы за экзамены",
+       x = "Экзамен",
+       y = "Баллы")+
+  theme_minimal()
+
+density_plot <- ggplot(exam_scores, aes(x = score, fill = exam))+
+  geom_density(alpha = 0.5)+
+  labs(title = "Плотность распределения баллов за экзамены",
+       x = "Баллы",
+       y = "Плотность")+
+  theme_minimal()
+
+combined_plot <- (hist_plot | box_plot) / density_plot
+combined_plot
+```
+
+2. Визуализируйте средний балл по зельеварению студентов с различным происхождением. 
+Вы вольны добавить дополнительные детали и информацию на график. Проинтерпретируйте результат. Как вы думаете,
+почему он именно такой? Если у вас есть гипотеза, проиллюстрируйте ее еще одним графиком (или графиками). Объедините их при помощи
+ggarrange. (по 1 б. за первый и график и правильную интерпретацию с подтверждением в виде второго графика и текстовой аргументации).
+Измените порядок ваших фигур на первом графике слева направо следующим образом: маглорожденные, чистокровные, полукровки.
+
+Скорректируйте название оси. Если у вас возникают сложности, обратитесь к шпаргалке по пакету forcats от posit. (Дополнительные 0.5 б.)
+
+```{r}
+average_scores <- hogwarts %>%
+  group_by(bloodStatus) %>%
+  summarise(avg_potions_score = mean(`Potions exam`, na.rm = TRUE)) %>%
+  mutate(bloodStatus = fct_relevel(bloodStatus, "muggle-born", "pure-blood", "half-blood"))
+
+avg_potions_plot <- ggplot(average_scores, aes(x = bloodStatus, y = avg_potions_score, fill = bloodStatus))+
+  geom_bar(stat = "identity", position = "dodge")+
+  labs(title = "Средний балл по зельеварению по происхождению студентов",
+       x = "Происхождение",
+       y = "Средний балл за экзамен по зельеварению")+
+  theme_minimal()
+
+boxplot_potions <- ggplot(hogwarts, aes(x = bloodStatus, y = `Potions exam`, fill = bloodStatus))+
+  geom_boxplot()+
+  labs(title = "Распределение баллов по зельеварению",
+       x = "Происхождение",
+       y = "Баллы за экзамен по зельеварению")+
+  theme_minimal()
+
+combined_plot <- ggarrange(avg_potions_plot, boxplot_potions, nrow = 2, ncol = 1)
+combined_plot
+
+ggsave("average_potions_distribution.png", plot = combined_plot, width = 8, height = 10)
+```
+Интерпретация результатов
+Мы видим, что маглорожденные студенты имеют более высокий средний балл по зельеварению, чем полукровные и чистокровные. 
+Это может быть связано с тем, что маглорожденные студенты, возможно, более мотивированы или используют разные подходы к обучению, нежели чистокровные. 
+
+## Воспроизведение графика
+
+1. Дополнительное задание на 4 балла. Воспроизведите график максимально близко к оригиналу и проинтерпретируйте его.
+
+```{r}
+hogwarts %>%
+  ggplot(aes(x = house, y = result, fill = house))+
+  geom_violin(trim = TRUE, scale = "area")+ 
+  geom_boxplot(width = 0.1, fill = "white")+
+  stat_summary(fun = "mean", geom = "point", shape = 23, size = 3, fill = "brown")+  
+  facet_wrap(~ sex, labeller = as_labeller(c("male" = "Мальчики", "female" = "Девочки")))+
+  scale_y_continuous(breaks = seq(-300, 300, by = 50))+
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red", linewidth = 1.2)+
+  scale_fill_manual(values = c("Gryffindor" = "#C50000", 
+                             "Hufflepuff" = "#ECB939", 
+                             "Ravenclaw" = "#41A6D9", 
+                             "Slytherin" = "#1F5D25"))+
+  labs(
+    title = "Баллы студентов Хогвартса",
+    subtitle = "Распределение числа баллов у студентов различных факультетов Хогвартса в 2023-2024 учебном году",
+    x = "",
+    y = "Количество очков",
+    fill = "Факультет"
+  )+
+  theme_classic()+
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 18),
+    plot.subtitle = element_text(hjust = 0.5, size = 14, color = "brown"),
+    axis.title.y = element_text(size = 14),
+    axis.text.x = element_blank(),
+    strip.text = element_text(size = 14),
+    legend.title = element_text(size = 12),
+    legend.text = element_text(size = 10),
+    legend.position = c(.5, .2),
+    legend.background = element_rect(fill = "transparent", colour = NA),
+    legend.key = element_rect(fill = "transparent", colour = NA),
+    strip.background = element_rect(fill = "gray90", colour = NA),
+    panel.border = element_blank(),
+    axis.line = element_blank(),
+    axis.ticks = element_line(color = "black")
+  )
+```
+На графике представлено распределение баллов среди студентов факультетов Хогвартса за учебный год 2023-2024.
+
+Основные наблюдения:
+Половые различия: График не выявляет значительных различий в оценках между мальчиками и девочками, за исключением студентов Слизерина, где наблюдаются определённые отличия.
