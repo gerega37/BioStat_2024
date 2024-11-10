@@ -1,0 +1,100 @@
+---
+title: "ADMH"
+output: html_document
+date: "2024-11-10"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(purrr)
+```
+
+```{r}
+ADSL <- read_excel("ADaM_coding/ADaM-like/ADSL.xlsx")
+head(ADSL)
+str(ADSL)
+```
+
+```{r}
+MH <- read_excel("ADaM_coding/SDTM/MH_MEDICALHISTORY.xlsx")
+head(MH)
+```
+```{r}
+str(MH)
+```
+
+В столбце MHTERM содержится много пустых строк, это может свидетельствовать о том, что запись медицинской истории не заполнена, однако для каждого субъекта заведено в EDC 61 форма Medical history, которые в будущем могут быть заполнены, но сейчас в статусе Scheduled. В таком случае исключим такие строки из финального набора данных и оставим только информативные.
+
+```{r}
+process_date <- function(date, is_end_date = FALSE, ongoing_status = NULL) {
+  # Значения по умолчанию
+  processed_date <- ""
+  imputation_flag <- ""
+  
+  # Если дата отсутствует
+  if (is.na(date) || date == "") {
+    imputation_flag <- "Y"
+    
+  # Если это конечная дата и статус "ONGOING"
+  } else if (is_end_date && ongoing_status == "ONGOING") {
+    processed_date <- ""
+    
+  # Проверяем, какие части даты (год, месяц, день) присутствуют
+  } else {
+    date_parts <- strsplit(date, "-")[[1]]
+    year_present <- nchar(date_parts[1]) == 4
+    month_present <- length(date_parts) > 1 && nchar(date_parts[2]) == 2
+    day_present <- length(date_parts) > 2 && nchar(date_parts[3]) == 2
+
+    # Форматируем дату на основе наличия частей (год, месяц, день)
+    if (year_present && month_present && day_present) {
+      processed_date <- paste(date_parts[3], date_parts[2], date_parts[1], sep = ".")
+    } else if (year_present && month_present) {
+      processed_date <- paste("01", date_parts[2], date_parts[1], sep = ".")
+      imputation_flag <- "D"
+    } else if (year_present) {
+      processed_date <- paste("01", "01", date_parts[1], sep = ".")
+      imputation_flag <- "M"
+    }
+  }
+  
+  # Возвращаем результат как список
+  return(list(date = processed_date, flag = imputation_flag))
+}
+```
+
+```{r}
+# Создаем ADMH, объединяя данные из ADSL и MH
+ADMH <- MH %>%
+  filter(MHCAT == "Medical History", !is.na(MHTERM) & MHTERM != "") %>%
+  left_join(ADSL, by = c("STUDYID", "SUBJID")) %>%
+  mutate(
+    USUBJID = ifelse(is.na(USUBJID), paste(STUDYID, SUBJID, sep = "-"), USUBJID),
+    MHCAT = "Medical History",
+    
+    start_result = map(MHSTDTC, ~ process_date(.)),
+    ASTDT = map_chr(start_result, "date"),
+    ASTDTF = map_chr(start_result, "flag"),
+    
+    end_result = map2(MHENDTC, MHENRTPT, ~ process_date(.x, is_end_date = TRUE, ongoing_status = .y)),
+    AENDT = map_chr(end_result, "date"),
+    AENDTF = map_chr(end_result, "flag"),
+    
+    MHENRF = ifelse(MHENRTPT == "ONGOING", "ONGOING", "")
+  ) %>%
+  select(
+    STUDYID, USUBJID, TRTP, TRTPN, MHSEQ, MHCAT, MHTERM, MHDECOD, MHBODSYS,
+    MHSTDTC, ASTDT, ASTDTF, MHENDTC, AENDT, AENDTF, MHENRTPT, MHENRF
+  )
+
+print(ADMH)
+```
+```{r}
+write.xlsx(ADMH, "ADaM_coding/ADaM-like/ADMH.xlsx")
+```
+
+
